@@ -15,11 +15,11 @@ int os_rmdir(lua_State* L)
 	const char* path = luaL_checkstring(L, 1);
 
 #if PLATFORM_WINDOWS
-	wchar_t wide_path[PATH_MAX];
-	if (MultiByteToWideChar(CP_UTF8, 0, path, -1, wide_path, PATH_MAX) == 0)
+	wchar_t wide_path[MAX_PATH + 1];
+	int size = MultiByteToWideChar(CP_UTF8, 0, path, -1, wide_path, MAX_PATH + 1);
+	if (size <= 0 || size > MAX_PATH)
 	{
-		lua_pushstring(L, "unable to encode path");
-		return lua_error(L);
+		return luaL_error(L, "unable to encode path");
 	}
 
 	z = RemoveDirectoryW(wide_path);

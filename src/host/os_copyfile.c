@@ -14,19 +14,18 @@ int os_copyfile(lua_State* L)
 	const char* dst = luaL_checkstring(L, 2);
 
 #if PLATFORM_WINDOWS
-	wchar_t wide_src[PATH_MAX];
-	wchar_t wide_dst[PATH_MAX];
+	wchar_t wide_src[PATH_MAX + 1], wide_dst[PATH_MAX + 1];
 
-	if (MultiByteToWideChar(CP_UTF8, 0, src, -1, wide_src, PATH_MAX) == 0)
+	int size = MultiByteToWideChar(CP_UTF8, 0, src, -1, wide_src, PATH_MAX + 1);
+	if (size <= 0 || size > PATH_MAX)
 	{
-		lua_pushstring(L, "unable to encode source path");
-		return lua_error(L);
+		return luaL_error(L, "unable to encode source path");
 	}
 
-	if (MultiByteToWideChar(CP_UTF8, 0, dst, -1, wide_dst, PATH_MAX) == 0)
+	size = MultiByteToWideChar(CP_UTF8, 0, dst, -1, wide_dst, PATH_MAX + 1);
+	if (size <= 0 || size > PATH_MAX)
 	{
-		lua_pushstring(L, "unable to encode source path");
-		return lua_error(L);
+		return luaL_error(L, "unable to encode destination path");
 	}
 
 	z = CopyFileW(wide_src, wide_dst, FALSE);
@@ -44,7 +43,7 @@ int os_copyfile(lua_State* L)
 			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf, 256, NULL);
 
 		char bufA[256];
-		WideCharToMultiByte(CP_UTF8, 0, buf, 256, bufA, 256, 0, 0);
+		WideCharToMultiByte(CP_UTF8, 0, buf, 256, bufA, 256, NULL, NULL);
 
 		lua_pushfstring(L, "unable to copy file to '%s', reason: '%s'", dst, bufA);
 #else

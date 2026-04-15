@@ -266,7 +266,16 @@ int premake_luaB_dofile(lua_State *L)
   * Copy of readable from loadlib.c in Lua source
   */
 static int readable(const char *filename) {
+#if defined(PLATFORM_WINDOWS)
+	FILE *f;
+	wchar_t wide_filename[MAX_PATH + 1];
+	int size = MultiByteToWideChar(CP_UTF8, 0, filename, -1, wide_filename, MAX_PATH + 1);
+	if (size <= 0 || size > MAX_PATH)
+		return 0;  /* unable to encode filename */
+	f = _wfopen(wide_filename, L"r");
+#else
 	FILE *f = fopen(filename, "r");  /* try to open file */
+#endif
 	if (f == NULL) return 0;  /* open failed */
 	fclose(f);
 	return 1;

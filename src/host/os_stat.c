@@ -15,11 +15,11 @@ int os_stat(lua_State* L)
 #if PLATFORM_WINDOWS
 	struct _stat s;
 
-	wchar_t wide_filename[PATH_MAX];
-	if (MultiByteToWideChar(CP_UTF8, 0, filename, -1, wide_filename, PATH_MAX) == 0)
+	wchar_t wide_filename[MAX_PATH + 1];
+	int size = MultiByteToWideChar(CP_UTF8, 0, filename, -1, wide_filename, MAX_PATH + 1);
+	if (size <= 0 || size > MAX_PATH)
 	{
-		lua_pushstring(L, "unable to encode source path");
-		return lua_error(L);
+		return luaL_error(L, "unable to encode source path");
 	}
 
 	if (_wstat(wide_filename, &s) != 0)
@@ -39,7 +39,7 @@ int os_stat(lua_State* L)
 			lua_pushfstring(L, "'%s' was not found", filename);
 			break;
 		default:
-			lua_pushfstring(L, "An  unknown error %d occured while accessing '%s'", errno, filename);
+			lua_pushfstring(L, "An unknown error %d (%s) occurred while accessing '%s'", errno, strerror(errno), filename);
 			break;
 		}
 		return 2;

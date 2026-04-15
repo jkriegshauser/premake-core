@@ -88,17 +88,23 @@ int getversion(struct OsVersionInfo* info)
 	info->description = "Windows";
 
 	// First get a friendly product name from the registry.
-	if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Windows NT\\CurrentVersion", 0, KEY_READ, &key) == ERROR_SUCCESS)
+	if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows NT\\CurrentVersion", 0, KEY_READ, &key) == ERROR_SUCCESS)
 	{
-		char value[512];
-		DWORD value_length = sizeof(value);
+		wchar_t wvalue[512];
+		DWORD wvalue_bytes = sizeof(wvalue);
 		DWORD type;
-		RegQueryValueExA(key, "productName", NULL, &type, (LPBYTE)value, &value_length);
+		RegQueryValueExW(key, L"productName", NULL, &type, (LPBYTE)wvalue, &wvalue_bytes);
 		RegCloseKey(key);
 		if (type == REG_SZ)
 		{
-			info->description = strdup(value);
-			info->isalloc = 1;
+			char value[512];
+			int size = WideCharToMultiByte(CP_UTF8, 0, wvalue, wvalue_bytes / sizeof(wchar_t), value, sizeof(value) - 1, NULL, NULL);
+			if (size > 0 && size < sizeof(value) - 1)
+			{
+				value[size] = '\0';
+				info->description = strdup(value);
+				info->isalloc = 1;
+			}
 		}
 	}
 

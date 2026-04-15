@@ -25,7 +25,12 @@
 #include "lua.h"
 
 #include "lauxlib.h"
+#include "lmem.h"
 
+#if defined(LUA_USE_WINDOWS)  /* PREMAKE: UTF-8 support on Windows */
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 
 /*
 ** {======================================================
@@ -706,19 +711,34 @@ LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
   int status, readstatus;
   int c;
   int fnameindex = lua_gettop(L) + 1;  /* index of filename on the stack */
+#if defined(LUA_USE_WINDOWS)  /* PREMAKE: UTF-8 character support on windows */
+  wchar_t wfilename[MAX_PATH + 1];
+  int size;
+#endif
   if (filename == NULL) {
     lua_pushliteral(L, "=stdin");
     lf.f = stdin;
   }
   else {
     lua_pushfstring(L, "@%s", filename);
+#if defined(LUA_USE_WINDOWS)  /* PREMAKE: UTF-8 character support on windows */
+    size = MultiByteToWideChar(CP_UTF8, 0, filename, -1, wfilename, MAX_PATH + 1);
+    if (size <= 0 || size > MAX_PATH)
+      return errfile(L, "convert", fnameindex);
+    lf.f = _wfopen(wfilename, L"r");
+#else
     lf.f = fopen(filename, "r");
+#endif
     if (lf.f == NULL) return errfile(L, "open", fnameindex);
   }
   if (skipcomment(&lf, &c))  /* read initial portion */
     lf.buff[lf.n++] = '\n';  /* add line to correct line numbers */
   if (c == LUA_SIGNATURE[0] && filename) {  /* binary file? */
+#if defined(LUA_USE_WINDOWS)  /* PREMAKE: UTF-8 character support on windows */
+    lf.f = _wfreopen(wfilename, L"rb", lf.f);  /* reopen in binary mode */
+#else
     lf.f = freopen(filename, "rb", lf.f);  /* reopen in binary mode */
+#endif
     if (lf.f == NULL) return errfile(L, "reopen", fnameindex);
     skipcomment(&lf, &c);  /* re-read initial portion */
   }

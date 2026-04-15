@@ -20,12 +20,13 @@
 #include "lua.h"
 
 #include "lauxlib.h"
+#include "lmem.h"
 #include "lualib.h"
 
 /*
 * PREMAKE change: UTF-8 character support on windows.
 */
-#if defined(LUA_WIN)
+#if defined(LUA_USE_WINDOWS)  /* PREMAKE: UTF-8 support on Windows */
 #include <windows.h>
 #endif
 
@@ -253,7 +254,17 @@ static LStream *newfile (lua_State *L) {
 
 static void opencheck (lua_State *L, const char *fname, const char *mode) {
   LStream *p = newfile(L);
+#if defined(LUA_USE_WINDOWS)  /* PREMAKE: UTF-8 support on Windows */
+  wchar_t wfname[MAX_PATH + 1];
+  wchar_t wmode[16];
+  if (MultiByteToWideChar(CP_UTF8, 0, fname, -1, wfname, MAX_PATH + 1) == 0)
+    luaL_error(L, "unable to encode filename");
+  if (MultiByteToWideChar(CP_UTF8, 0, mode, -1, wmode, 16) == 0)
+    luaL_error(L, "unable to encode open mode");
+  p->f = _wfopen(wfname, wmode);
+#else
   p->f = fopen(fname, mode);
+#endif
   if (p->f == NULL)
     luaL_error(L, "cannot open file '%s' (%s)", fname, strerror(errno));
 }
@@ -264,28 +275,20 @@ static int io_open (lua_State *L) {
   const char *mode = luaL_optstring(L, 2, "r");
   LStream *p = newfile(L);
   const char *md = mode;  /* to traverse/check mode */
+#if defined(LUA_USE_WINDOWS)  /* PREMAKE: UTF-8 support on Windows */
+  wchar_t wfilename[MAX_PATH + 1];
+  wchar_t wmode[16];
+  int size;
   luaL_argcheck(L, l_checkmode(md), 2, "invalid mode");
-
-  /*
-   * PREMAKE change: UTF-8 character support on windows.
-   */
-#if defined(LUA_WIN)
-  wchar_t wide_path[4096];
-  if (MultiByteToWideChar(CP_UTF8, 0, filename, -1, wide_path, 4096) == 0)
-  {
-    lua_pushstring(L, "unable to encode path");
-    return lua_error(L);
-  }
-
-  wchar_t wide_mode[64];
-  if (MultiByteToWideChar(CP_UTF8, 0, mode, -1, wide_mode, 64) == 0)
-  {
-    lua_pushstring(L, "unable to encode open mode");
-    return lua_error(L);
-  }
-
-  p->f = _wfopen(wide_path, wide_mode);
+  size = MultiByteToWideChar(CP_UTF8, 0, filename, -1, wfilename, MAX_PATH + 1);
+  if (size <= 0 || size > MAX_PATH)
+    return luaL_error(L, "unable to encode filename");
+  size = MultiByteToWideChar(CP_UTF8, 0, mode, -1, wmode, 16);
+  if (size <= 0 || size >= 16)
+    return luaL_error(L, "unable to encode mode");
+  p->f = _wfopen(wfilename, wmode);
 #else
+  luaL_argcheck(L, l_checkmode(md), 2, "invalid mode");
   p->f = fopen(filename, mode);
 #endif
 
@@ -306,7 +309,19 @@ static int io_popen (lua_State *L) {
   const char *filename = luaL_checkstring(L, 1);
   const char *mode = luaL_optstring(L, 2, "r");
   LStream *p = newprefile(L);
+#if defined(LUA_USE_WINDOWS)
+  wchar_t wfilename[MAX_PATH + 1];
+  wchar_t wmode[16];
+  int size = MultiByteToWideChar(CP_UTF8, 0, mode, -1, wmode, 16);
+  if (size <= 0 || size >= 16)
+    return luaL_error(L, "unable to encode mode");
+  size = MultiByteToWideChar(CP_UTF8, 0, filename, -1, wfilename, MAX_PATH + 1);
+  if (size <= 0 || size > MAX_PATH)
+    return luaL_error(L, "unable to encode filename");
+  p->f = _wpopen(wfilename, wmode);
+#else
   p->f = l_popen(L, filename, mode);
+#endif
   p->closef = &io_pclose;
   return (p->f == NULL) ? luaL_fileresult(L, 0, filename) : 1;
 }

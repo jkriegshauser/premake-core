@@ -530,18 +530,30 @@ static int runargs (lua_State *L, char **argv, int n) {
   return 1;
 }
 
-
+/* getenv() on Windows isn't trivial, so use the implementation from oslib */
+extern int os_getenv (lua_State *L);  /* from loslib.c */
 
 static int handle_luainit (lua_State *L) {
-  const char *name = "=" LUA_INITVARVERSION;
-  const char *init = getenv(name + 1);
-  if (init == NULL) {
+  const char *name = "=" LUA_INITVARVERSION, *init;
+  lua_pushcfunction(L, os_getenv);
+  lua_pushstring(L, name + 1);
+  lua_call(L, 1, 1);
+  if (lua_isnil(L, -1))
+  {
+    lua_pop(L, 1);
     name = "=" LUA_INIT_VAR;
-    init = getenv(name + 1);  /* try alternative name */
+    lua_pushcfunction(L, os_getenv);
+    lua_pushstring(L, name + 1);
+    lua_call(L, 1, 1);
   }
-  if (init == NULL) return LUA_OK;
-  else if (init[0] == '@')
-    return dofile(L, init+1);
+  if (lua_isnil(L, -1))
+  {
+    lua_pop(L, 1);
+    return LUA_OK;
+  }
+  init = lua_tostring(L, -1);
+  if (init[0] == '@')
+    return dofile(L, init + 1);
   else
     return dostring(L, init, name);
 }

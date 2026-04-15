@@ -656,7 +656,7 @@ end
 
 	function suite.remove_ReturnsTrue_OnUnicodeFile()
 		local p = tmpname() .. "_café"
-		io.open(p, "w"):close()
+		os.touchfile(p)
 		local ok, err = os.remove(p)
 		test.isequal(true, ok)
 		test.isnil(err)
@@ -693,7 +693,7 @@ end
 	function suite.rename_ReturnsTrue_OnUnicodeSrc()
 		local src = tmpname() .. "_café"
 		local dst = tmpname()
-		io.open(src, "w"):close()
+		os.touchfile(src)
 		local ok, err = os.rename(src, dst)
 		test.isequal(true, ok)
 		test.isnil(err)
@@ -712,7 +712,7 @@ end
 	function suite.rename_ReturnsTrue_OnUnicodeSrcAndDst()
 		local src = tmpname() .. "_café"
 		local dst = tmpname() .. "_naïve"
-		io.open(src, "w"):close()
+		os.touchfile(src)
 		local ok, err = os.rename(src, dst)
 		test.isequal(true, ok)
 		test.isnil(err)

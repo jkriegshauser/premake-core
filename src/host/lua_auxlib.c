@@ -103,7 +103,7 @@ int premake_luaL_loadfilex (lua_State* L, const char* filename, const char* mode
 	 * script chunk on the stack. Turn these into a closure that will call my
 	 * wrapper below when the loaded script needs to be executed. */
 
-	assert(lua_gettop(L) == bottom + 2);
+	assert(lua_gettop(L) == bottom + (z == OKAY ? 2 : 0));
 
 	if (z == OKAY) {
 		/* if we are called with an env, then our caller, luaB_loadfile, will

@@ -309,7 +309,7 @@
 			targetdir   "bin/release"
 
 		filter "system:windows"
-			links       { "ole32", "ws2_32", "advapi32", "version" }
+			links       { "ole32", "ws2_32", "advapi32", "version", "user32", "shell32" }
 			files { "src/**.rc" }
 
 		filter "toolset:mingw"

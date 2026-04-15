@@ -19,8 +19,13 @@
 #include "lua.h"
 
 #include "lauxlib.h"
+#include "lmem.h"
 #include "lualib.h"
 
+#if defined(LUA_USE_WINDOWS)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 
 /*
 ** {==================================================================
@@ -140,7 +145,23 @@ static time_t l_checktime (lua_State *L, int arg) {
 
 static int os_execute (lua_State *L) {
   const char *cmd = luaL_optstring(L, 1, NULL);
-  int stat = system(cmd);
+  int stat;
+#if defined(LUA_USE_WINDOWS)
+  wchar_t* wcmd = NULL;
+  int size = 0;
+  if (cmd != NULL)
+  {
+    size = MultiByteToWideChar(CP_UTF8, 0, cmd, -1, NULL, 0);
+    if (size <= 0)
+      return luaL_error(L, "unable to encode command");
+    wcmd = luaM_newvector(L, size, wchar_t);
+    MultiByteToWideChar(CP_UTF8, 0, cmd, -1, wcmd, size);
+  }
+  stat = _wsystem(wcmd);
+  luaM_freemem(L, wcmd, size * sizeof(wchar_t));
+#else
+  stat = system(cmd);
+#endif
   if (cmd != NULL)
     return luaL_execresult(L, stat);
   else {
@@ -152,30 +173,104 @@ static int os_execute (lua_State *L) {
 
 static int os_remove (lua_State *L) {
   const char *filename = luaL_checkstring(L, 1);
+#if defined(LUA_USE_WINDOWS)
+  wchar_t wfilename[MAX_PATH + 1];
+  int result;
+  int size = MultiByteToWideChar(CP_UTF8, 0, filename, -1, wfilename, MAX_PATH + 1);
+  if (size <= 0 || size > MAX_PATH)
+    return luaL_error(L, "unable to encode filename");
+  return luaL_fileresult(L, _wremove(wfilename) == 0, filename);
+#else
   return luaL_fileresult(L, remove(filename) == 0, filename);
+#endif
 }
 
 
 static int os_rename (lua_State *L) {
   const char *fromname = luaL_checkstring(L, 1);
   const char *toname = luaL_checkstring(L, 2);
+#if defined(LUA_USE_WINDOWS)  /* PREMAKE: UTF-8 support on Windows */
+  wchar_t wfrom[MAX_PATH + 1], wto[MAX_PATH + 1];
+  int size = MultiByteToWideChar(CP_UTF8, 0, fromname, -1, wfrom, MAX_PATH + 1);
+  if (size <= 0 || size > MAX_PATH)
+    return luaL_error(L, "unable to encode `from' filename");
+  size = MultiByteToWideChar(CP_UTF8, 0, toname, -1, wto, MAX_PATH + 1);
+  if (size <= 0 || size > MAX_PATH)
+    return luaL_error(L, "unable to encode `to' filename");
+  return luaL_fileresult(L, _wrename(wfrom, wto) == 0, NULL);
+#else
   return luaL_fileresult(L, rename(fromname, toname) == 0, NULL);
+#endif
 }
 
 
 static int os_tmpname (lua_State *L) {
   char buff[LUA_TMPNAMBUFSIZE];
+#if defined(LUA_USE_WINDOWS)  /* PREMAKE: UTF-8 support on Windows */
+  wchar_t wbuff[LUA_TMPNAMBUFSIZE];
+  int size;
+
+  if (_wtmpnam(wbuff) == NULL)
+    return luaL_error(L, "unable to generate a unique filename");
+  
+  size = WideCharToMultiByte(CP_UTF8, 0, wbuff, -1, buff, LUA_TMPNAMBUFSIZE, NULL, NULL);
+  if (size <= 0)
+    return luaL_error(L, "unable to generate a unique filename");
+#else
   int err;
   lua_tmpnam(buff, err);
   if (err)
     return luaL_error(L, "unable to generate a unique filename");
+#endif
   lua_pushstring(L, buff);
   return 1;
 }
 
 
-static int os_getenv (lua_State *L) {
+int os_getenv (lua_State *L) {
+#if defined(LUA_USE_WINDOWS)
+  DWORD size = 0;
+  wchar_t* wname, *data = NULL;
+  const char* name = luaL_checkstring(L, 1);
+  char* convert;
+  int convert_size = MultiByteToWideChar(CP_UTF8, 0, name, -1, NULL, 0);
+  if (convert_size <= 0)
+    return luaL_error(L, "unable to encode environment variable");
+  wname = _alloca(convert_size * sizeof(wchar_t));
+  MultiByteToWideChar(CP_UTF8, 0, name, -1, wname, convert_size);
+
+  /* do this in a loop since it can change while we're iterating */
+  /* env vars can also be very large, so use luaM for the memory */
+  for (;;)
+  {
+    DWORD rc = GetEnvironmentVariableW(wname, data, size);
+    if (rc == 0)
+    {
+      if (GetLastError() == ERROR_ENVVAR_NOT_FOUND)
+        return (lua_pushnil(L), 1);
+      luaM_freemem(L, data, size * sizeof(wchar_t));
+      return luaL_error(L, "unable to get environment variable");
+    }
+    if (rc < size)
+      break;
+    luaM_reallocvector(L, data, size, rc, wchar_t);
+    size = rc;
+  }
+
+  convert_size = WideCharToMultiByte(CP_UTF8, 0, data, -1, NULL, 0, NULL, NULL);
+  if (convert_size <= 0)
+  {
+    luaM_freemem(L, data, size * sizeof(wchar_t));
+    return luaL_error(L, "unable to encode environment variable");
+  }
+  convert = luaM_reallocvchar(L, NULL, 0, convert_size);
+  WideCharToMultiByte(CP_UTF8, 0, data, -1, convert, convert_size, NULL, NULL);
+  lua_pushstring(L, convert);
+  luaM_freemem(L, convert, convert_size * sizeof(char));
+  luaM_freemem(L, data, size * sizeof(wchar_t));
+#else
   lua_pushstring(L, getenv(luaL_checkstring(L, 1)));  /* if NULL push nil */
+#endif
   return 1;
 }
 

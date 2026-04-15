@@ -11,6 +11,7 @@
 #include "premake.h"
 #ifdef LUA_STATICLIB
 #include "lua_shimtable.h"
+#include "lauxlib.h"
 #endif
 
 #if PLATFORM_MACOSX
@@ -178,14 +179,64 @@ void luaL_register(lua_State *L, const char *libname, const luaL_Reg *l)
 	lua_pop(L, 1);
 }
 
+#if PLATFORM_WINDOWS
+int get_envvar(wchar_t **pvalue, DWORD *psize, const wchar_t *name)
+{
+	/* do this in a loop since the environment variable can be changed */
+	for (;;)
+	{
+		DWORD size = GetEnvironmentVariableW(name, *pvalue, *psize);
+		if (size == 0) return 0; /* failed or not found */
+		if (size < *psize) return 1; /* found and written to buffer */
+		/* resize buffer and try again */
+		*psize = size;
+		*pvalue = (wchar_t *)realloc(*pvalue, size * sizeof(wchar_t));
+		if (*pvalue == NULL) return 0; /* failed */
+	}
+}
+
+static void set_home_dir(lua_State* L)
+{
+	wchar_t *wval = NULL;
+	DWORD size = 0;
+	char *val = NULL;
+
+	int success = get_envvar(&wval, &size, L"HOME");
+	if (!success) success = get_envvar(&wval, &size, L"USERPROFILE");
+	if (success)
+	{
+		int s = WideCharToMultiByte(CP_UTF8, 0, wval, -1, NULL, 0, NULL, NULL);
+		if (s > 0)
+		{
+			val = (char *)malloc(s);
+			if (val != NULL)
+			{
+				WideCharToMultiByte(CP_UTF8, 0, wval, -1, val, s, NULL, NULL);
+			}
+		}
+	}
+	lua_pushstring(L, val ? val : "~");
+	lua_setglobal(L, "_USER_HOME_DIR");
+	if (wval) free(wval);
+	if (val) free(val);
+}
+#else
+static void set_home_dir(lua_State* L)
+{
+	const char *value = getenv("HOME");
+	if (!value) value = getenv("USERPROFILE");
+	if (!value) value = "~";
+	lua_pushstring(L, value);
+	lua_setglobal(L, "_USER_HOME_DIR");
+}
+#endif
+
 
 /**
  * Initialize the Premake Lua environment.
  */
 int premake_init(lua_State* L)
 {
-	const char* value;
-
 	// Replace Lua functions
 	lua_pushcfunction(L, premake_luaB_loadfile);
 	lua_setglobal(L, "loadfile");
@@ -243,11 +294,7 @@ int premake_init(lua_State* L)
 #endif
 
 	/* find the user's home directory */
-	value = getenv("HOME");
-	if (!value) value = getenv("USERPROFILE");
-	if (!value) value = "~";
-	lua_pushstring(L, value);
-	lua_setglobal(L, "_USER_HOME_DIR");
+	set_home_dir(L);
 
 	/* publish the initial working directory */
 	os_getcwd(L);
@@ -364,42 +411,46 @@ int premake_execute(lua_State* L, int argc, const char** argv, const char* scrip
  */
 int premake_locate_executable(lua_State* L, const char* argv0)
 {
-	char buffer[PATH_MAX];
+	char buffer[PATH_MAX + 1];
 	const char* path = NULL;
 
 #if PLATFORM_WINDOWS
-	wchar_t widebuffer[PATH_MAX];
+	wchar_t widebuffer[PATH_MAX + 1];
+	wchar_t *wpath = NULL;
+	DWORD size = 0;
 
-	DWORD len = GetModuleFileNameW(NULL, widebuffer, PATH_MAX);
-	if (len > 0)
+	DWORD len = GetModuleFileNameW(NULL, widebuffer, PATH_MAX + 1);
+	if (len > 0 && len <= PATH_MAX)
 	{
-		WideCharToMultiByte(CP_UTF8, 0, widebuffer, len, buffer, PATH_MAX, NULL, NULL);
-
-		buffer[len] = 0;
-		path = buffer;
+		int s = WideCharToMultiByte(CP_UTF8, 0, widebuffer, len, buffer, PATH_MAX, NULL, NULL);
+		if (s > 0 && s <= PATH_MAX)
+		{
+			buffer[s] = '\0'; // we have to null terminate because `len` was passed above
+			path = buffer;
+		}
 	}
 #endif
 
 #if PLATFORM_MACOSX
 	CFURLRef bundleURL = CFBundleCopyExecutableURL(CFBundleGetMainBundle());
 	CFStringRef pathRef = CFURLCopyFileSystemPath(bundleURL, kCFURLPOSIXPathStyle);
-	if (CFStringGetCString(pathRef, buffer, PATH_MAX - 1, kCFStringEncodingUTF8))
+	if (CFStringGetCString(pathRef, buffer, PATH_MAX, kCFStringEncodingUTF8))
 		path = buffer;
 #endif
 
 #if PLATFORM_LINUX
-	int len = readlink("/proc/self/exe", buffer, PATH_MAX - 1);
+	int len = readlink("/proc/self/exe", buffer, PATH_MAX);
 	if (len > 0)
 	{
-		buffer[len] = 0;
+		buffer[len] = '\0';
 		path = buffer;
 	}
 #endif
 
 #if PLATFORM_BSD && !defined(__OpenBSD__)
-	int len = readlink("/proc/curproc/file", buffer, PATH_MAX - 1);
+	int len = readlink("/proc/curproc/file", buffer, PATH_MAX);
 	if (len < 0)
-		len = readlink("/proc/curproc/exe", buffer, PATH_MAX - 1);
+		len = readlink("/proc/curproc/exe", buffer, PATH_MAX);
 	if (len < 0)
 	{
 		int mib[4];
@@ -413,16 +464,16 @@ int premake_locate_executable(lua_State* L, const char* argv0)
 	}
 	if (len > 0)
 	{
-		buffer[len] = 0;
+		buffer[len] = '\0';
 		path = buffer;
 	}
 #endif
 
 #if PLATFORM_SOLARIS
-	int len = readlink("/proc/self/path/a.out", buffer, PATH_MAX - 1);
+	int len = readlink("/proc/self/path/a.out", buffer, PATH_MAX);
 	if (len > 0)
 	{
-		buffer[len] = 0;
+		buffer[len] = '\0';
 		path = buffer;
 	}
 #endif
@@ -434,7 +485,30 @@ int premake_locate_executable(lua_State* L, const char* argv0)
 	{
 		lua_pushcfunction(L, os_pathsearch);
 		lua_pushstring(L, argv0);
+#if PLATFORM_WINDOWS
+		if (get_envvar(&wpath, &size, L"PATH"))
+		{
+			int s = WideCharToMultiByte(CP_UTF8, 0, wpath, -1, NULL, 0, NULL, NULL);
+			if (s > 0)
+			{
+				char *p = malloc(s);
+				if (p)
+				{
+					WideCharToMultiByte(CP_UTF8, 0, wpath, -1, p, s, NULL, NULL);
+					lua_pushstring(L, p);
+					free(p);
+				}
+				else
+					lua_pushnil(L);
+			}
+			else
+				lua_pushnil(L);
+		}
+		else
+			lua_pushnil(L);
+#else
 		lua_pushstring(L, getenv("PATH"));
+#endif
 		if (lua_pcall(L, 2, 1, 0) == OKAY && !lua_isnil(L, -1))
 		{
 			lua_pushstring(L, "/");
@@ -443,6 +517,13 @@ int premake_locate_executable(lua_State* L, const char* argv0)
 			path = lua_tostring(L, -1);
 		}
 		lua_pop(L, 1);
+
+		if (wpath)
+		{
+			free(wpath);
+			wpath = NULL;
+			size = 0;
+		}
 	}
 
 	/* If all else fails, use argv[0] as-is and hope for the best */
@@ -492,8 +573,30 @@ int premake_locate_file(lua_State* L, const char* filename, int searchMask)
 	}
 
 	if (searchMask & SEARCH_PATH) {
+#if PLATFORM_WINDOWS
+		wchar_t *wpath = NULL;
+		DWORD size = 0;
+		if (get_envvar(&wpath, &size, L"PREMAKE_PATH")) {
+			int s = WideCharToMultiByte(CP_UTF8, 0, wpath, -1, NULL, 0, NULL, NULL);
+			if (s > 0) {
+				char *p = malloc(s);
+				if (p) {
+					int located;
+					WideCharToMultiByte(CP_UTF8, 0, wpath, -1, p, s, NULL, NULL);
+					located = do_locate(L, filename, p);
+					free(p);
+					if (located) {
+						if (wpath) free(wpath);
+						return OKAY;
+					}
+				}
+			}
+		}
+		if (wpath) free(wpath);
+#else
 		const char* path = getenv("PREMAKE_PATH");
 		if (path && do_locate(L, filename, path)) return OKAY;
+#endif
 	}
 
 #if !defined(PREMAKE_NO_BUILTIN_SCRIPTS)
@@ -545,11 +648,34 @@ static void build_premake_path(lua_State* L)
 	}
 
 	/* Then the PREMAKE_PATH environment variable */
+#if PLATFORM_WINDOWS
+	{
+		(void)value;
+		wchar_t *wpath = NULL;
+		DWORD size = 0;
+		if (get_envvar(&wpath, &size, L"PREMAKE_PATH"))
+		{
+			int s = WideCharToMultiByte(CP_UTF8, 0, wpath, -1, NULL, 0, NULL, NULL);
+			if (s > 0)
+			{
+				char *p = malloc(s);
+				if (p)
+				{
+					lua_pushstring(L, ";");
+					lua_pushstring(L, p);
+					free(p);
+				}
+			}
+		}
+		if (wpath) free(wpath);
+	}
+#else
 	value = getenv("PREMAKE_PATH");
 	if (value) {
 		lua_pushstring(L, ";");
 		lua_pushstring(L, value);
 	}
+#endif
 
 	/* Then in ~/.premake */
 	lua_pushstring(L, ";");

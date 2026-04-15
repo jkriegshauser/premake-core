@@ -23,8 +23,21 @@ int http_download(lua_State* L)
 
 	FILE* fp;
 	const char* file = luaL_checkstring(L, 2);
-
+#if PLATFORM_WINDOWS
+	{
+		wchar_t wfile[MAX_PATH + 1];
+		int size = MultiByteToWideChar(CP_UTF8, 0, file, -1, wfile, MAX_PATH + 1);
+		if (size <= 0 || size > MAX_PATH)
+		{
+			lua_pushstring(L, "Unable to encode file path");
+			lua_pushnumber(L, -1);
+			return 2;
+		}
+		fp = _wfopen(wfile, L"wb");
+	}
+#else
 	fp = fopen(file, "wb");
+#endif
 	if (!fp)
 	{
 		lua_pushstring(L, "Unable to open file.");

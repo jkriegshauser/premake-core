@@ -22,17 +22,18 @@ int os_comparefiles(lua_State* L)
 	const char* firstPath = luaL_checkstring(L, 1);
 	const char* secondPath = luaL_checkstring(L, 2);
 
-	#if PLATFORM_WINDOWS
-	wchar_t wide_firstPath[PATH_MAX];
-	if (MultiByteToWideChar(CP_UTF8, 0, firstPath, -1, wide_firstPath, PATH_MAX) == 0)
+#if PLATFORM_WINDOWS
+	wchar_t wide_firstPath[PATH_MAX + 1], wide_secondPath[PATH_MAX + 1];
+	int size = MultiByteToWideChar(CP_UTF8, 0, firstPath, -1, wide_firstPath, PATH_MAX + 1);
+	if (size <= 0 || size > PATH_MAX)
 	{
 		lua_pushnil(L);
 		lua_pushstring(L, "unable to encode first path");
 		return 2;
 	}
 
-	wchar_t wide_secondPath[PATH_MAX];
-	if (MultiByteToWideChar(CP_UTF8, 0, secondPath, -1, wide_secondPath, PATH_MAX) == 0)
+	size = MultiByteToWideChar(CP_UTF8, 0, secondPath, -1, wide_secondPath, PATH_MAX + 1);
+	if (size <= 0 || size > PATH_MAX)
 	{
 		lua_pushnil(L);
 		lua_pushstring(L, "unable to encode second path");
@@ -41,10 +42,10 @@ int os_comparefiles(lua_State* L)
 
 	firstFile = _wfopen(wide_firstPath, L"rb");
 	secondFile = _wfopen(wide_secondPath, L"rb");
-	#else
+#else
 	firstFile = fopen(firstPath, "rb");
 	secondFile = fopen(secondPath, "rb");
-	#endif
+#endif
 
 	if (!firstFile)
 	{

@@ -8,43 +8,42 @@
 #include <sys/stat.h>
 #include "premake.h"
 
-#ifdef _WIN32
+#if PLATFORM_WINDOWS
 #include <windows.h>
 #endif
 
 int os_isdir(lua_State* L)
 {
-	struct stat buf;
 	const char* path = luaL_checkstring(L, 1);
-#ifdef _WIN32
-	DWORD attr;
-
-	wchar_t wide_path[PATH_MAX];
-	if (MultiByteToWideChar(CP_UTF8, 0, path, -1, wide_path, PATH_MAX) == 0)
-	{
-		lua_pushstring(L, "unable to encode path");
-		return lua_error(L);
-	}
-#endif
 
 	/* empty path is equivalent to ".", must be true */
-	if (strlen(path) == 0)
+	if (*path == '\0')
 	{
 		lua_pushboolean(L, 1);
+		return 1;
 	}
-#ifdef _WIN32
-	// Use Windows-specific GetFileAttributes since it deals with symbolic links.
-	else if ((attr = GetFileAttributesW(wide_path)) != INVALID_FILE_ATTRIBUTES)
+
+#if PLATFORM_WINDOWS
+	struct _stat buf;
+	wchar_t wide_path[PATH_MAX + 1];
+	int size = MultiByteToWideChar(CP_UTF8, 0, path, -1, wide_path, PATH_MAX + 1);
+	if (size <= 0 || size > PATH_MAX)
 	{
-		int isdir = (attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
-		lua_pushboolean(L, isdir);
+		return luaL_error(L, "unable to encode path");
 	}
-#endif
-	else if (stat(path, &buf) == 0)
+	if (_wstat(wide_path, &buf) == 0)
 	{
 		int isdir = (buf.st_mode & S_IFDIR) != 0;
 		lua_pushboolean(L, isdir);
 	}
+#else
+	struct stat buf;
+	if (stat(path, &buf) == 0)
+	{
+		int isdir = (buf.st_mode & S_IFDIR) != 0;
+		lua_pushboolean(L, isdir);
+	}
+#endif
 	else
 	{
 		lua_pushboolean(L, 0);

@@ -12,6 +12,8 @@ int do_linkfile(lua_State* L, const char* src, const char* dst)
 #if PLATFORM_WINDOWS
     char dstPath[MAX_PATH];
 	char srcPath[MAX_PATH];
+	wchar_t wSrcPath[MAX_PATH + 1], wDstPath[MAX_PATH + 1];
+	int size;
 
 	do_normalize(L, srcPath, src);
 	do_normalize(L, dstPath, dst);
@@ -19,23 +21,25 @@ int do_linkfile(lua_State* L, const char* src, const char* dst)
 	do_translate(srcPath, '\\');
 
 	// Promote to wide path
-	wchar_t wSrcPath[MAX_PATH];
-	wchar_t wDstPath[MAX_PATH];
-
-	MultiByteToWideChar(CP_UTF8, 0, srcPath, -1, wSrcPath, MAX_PATH);
-	MultiByteToWideChar(CP_UTF8, 0, dstPath, -1, wDstPath, MAX_PATH);
+	size = MultiByteToWideChar(CP_UTF8, 0, srcPath, -1, wSrcPath, MAX_PATH + 1);
+	if (size <= 0 || size > PATH_MAX)
+		return FALSE;
+	size = MultiByteToWideChar(CP_UTF8, 0, dstPath, -1, wDstPath, MAX_PATH + 1);
+	if (size <= 0 || size > PATH_MAX)
+		return FALSE;
 
 	// If the source path is relative, prepend the current working directory
 	if (!do_isabsolute(src))
 	{
 		// Get the current working directory
-		wchar_t cwd[MAX_PATH];
-		GetCurrentDirectoryW(MAX_PATH, cwd);
+		wchar_t cwd[MAX_PATH + 1];
+		if (GetCurrentDirectoryW(MAX_PATH + 1, cwd) > MAX_PATH)
+			return FALSE;
 
 		// Convert the source path to a relative path
-		wchar_t relSrcPath[MAX_PATH + 2];
-		swprintf(relSrcPath, MAX_PATH + 2, L"%c:%s", cwd[0], wSrcPath);
-		relSrcPath[MAX_PATH + 1] = L'\0';
+		wchar_t relSrcPath[2 * MAX_PATH + 1];
+		swprintf(relSrcPath, 2 * MAX_PATH + 1, L"%s\\%s", cwd, wSrcPath);
+		relSrcPath[2 * MAX_PATH] = L'\0';
 
 		BOOLEAN res = CreateSymbolicLinkW(wDstPath, relSrcPath, SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE);
 		return res != 0;

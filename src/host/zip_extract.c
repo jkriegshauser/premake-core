@@ -77,8 +77,18 @@ static int write_link(const char* filename, const char* bytes, size_t count)
 #if PLATFORM_POSIX
 	(void)(count);
 	return symlink(bytes, filename);
+#elif PLATFORM_WINDOWS
+	wchar_t wfilename[MAX_PATH + 1];
+	int size = MultiByteToWideChar(CP_UTF8, 0, filename, -1, wfilename, MAX_PATH + 1);
+	if (size <= 0 || size > MAX_PATH)
+	{
+		printf("Unable to encode filename: %s\n", filename);
+		return -1;
+	}
+	FILE* fp = _wfopen(wfilename, L"wb");
 #else
 	FILE* fp = fopen(filename, "wb");
+#endif
 	if (fp == NULL)
 	{
 		printf("Error creating file:\n  %s\n", filename);
@@ -87,7 +97,6 @@ static int write_link(const char* filename, const char* bytes, size_t count)
 	fwrite(bytes, sizeof(char), count, fp);
 	fclose(fp);
 	return 0;
-#endif
 }
 
 extern int do_mkdir(const char* path);
@@ -179,7 +188,20 @@ static int extract(const char* src, const char* destination)
 				// mark as read-write, so we can overwrite the file if it already exists.
 				chmod(appended_full_name, 0666);
 
+#if PLATFORM_WINDOWS
+				{
+					wchar_t wappended_full_name[MAX_PATH + 1];
+					int size = MultiByteToWideChar(CP_UTF8, 0, appended_full_name, -1, wappended_full_name, MAX_PATH + 1);
+					if (size <= 0 || size > MAX_PATH)
+					{
+						printf("  Unable to encode appended full name: %s\n", appended_full_name);
+						return -1;
+					}
+					fp = _wfopen(wappended_full_name, L"wb");
+				}
+#else
 				fp = fopen(appended_full_name, "wb");
+#endif
 				if (fp == NULL)
 				{
 					printf("Error creating file:\n  %s\n", appended_full_name);

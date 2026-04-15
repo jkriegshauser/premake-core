@@ -10,6 +10,8 @@
 -- loadfile
 --
 
+local real_io_open = io.open
+
 function suite.loadfile()
 	local file =  path.join(_SCRIPT_DIR, "test_lua_loaded_noenv.lua")
 	local fn = assert(loadfile(file, nil))
@@ -54,7 +56,7 @@ function suite.loadfile_UnicodeFilename()
 	local p = os.tmpname()
 	os.remove(p)
 	p = p .. "_café.lua"
-	local f = assert(io.open(p, "w"))
+	local f = assert(real_io_open(p, "w"))
 	f:write("return 42\n")
 	f:close()
 	local fn = assert(loadfile(p))
@@ -73,10 +75,10 @@ function suite.io_open_WriteReadUnicodeFilename()
 	local p = os.tmpname()
 	os.remove(p)
 	p = p .. "_café"
-	local f = assert(io.open(p, "w"))
+	local f = assert(real_io_open(p, "w"))
 	f:write("hello unicode")
 	f:close()
-	f = assert(io.open(p, "r"))
+	f = assert(real_io_open(p, "r"))
 	local content = f:read("*a")
 	f:close()
 	os.remove(p)
@@ -87,13 +89,13 @@ function suite.io_open_AppendModeUnicodeFilename()
 	local p = os.tmpname()
 	os.remove(p)
 	p = p .. "_données"
-	local f = assert(io.open(p, "w"))
+	local f = assert(real_io_open(p, "w"))
 	f:write("first")
 	f:close()
-	f = assert(io.open(p, "a"))
+	f = assert(real_io_open(p, "a"))
 	f:write("second")
 	f:close()
-	f = assert(io.open(p, "r"))
+	f = assert(real_io_open(p, "r"))
 	local content = f:read("*a")
 	f:close()
 	os.remove(p)
@@ -101,7 +103,7 @@ function suite.io_open_AppendModeUnicodeFilename()
 end
 
 function suite.io_open_ReturnsNil_OnMissingUnicodeFile()
-	local f, err = io.open(os.tmpname() .. "_noëxist", "r")
+	local f, err = real_io_open(os.tmpname() .. "_noëxist", "r")
 	test.isnil(f)
 	test.isequal("string", type(err))
 end

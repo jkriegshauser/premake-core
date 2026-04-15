@@ -23,11 +23,11 @@ int os_matchstart(lua_State* L)
 	const char* mask = luaL_checkstring(L, 1);
 	MatchInfo* m;
 
-	wchar_t wide_mask[PATH_MAX];
-	if (MultiByteToWideChar(CP_UTF8, 0, mask, -1, wide_mask, PATH_MAX) == 0)
+	wchar_t wide_mask[MAX_PATH + 1];
+	int size =MultiByteToWideChar(CP_UTF8, 0, mask, -1, wide_mask, MAX_PATH + 1);
+	if (size <= 0 || size > MAX_PATH)
 	{
-		lua_pushstring(L, "unable to encode mask");
-		return lua_error(L);
+		return luaL_error(L, "unable to encode mask");
 	}
 
 	m = (MatchInfo*)malloc(sizeof(MatchInfo));
@@ -51,11 +51,11 @@ int os_matchname(lua_State* L)
 {
 	MatchInfo* m = (MatchInfo*)lua_touserdata(L, 1);
 
-	char filename[PATH_MAX];
-	if (WideCharToMultiByte(CP_UTF8, 0, m->entry.cFileName, -1, filename, PATH_MAX, NULL, NULL) == 0)
+	char filename[MAX_PATH + 1];
+	int size = WideCharToMultiByte(CP_UTF8, 0, m->entry.cFileName, -1, filename, MAX_PATH + 1, NULL, NULL);
+	if (size <= 0 || size > MAX_PATH)
 	{
-		lua_pushstring(L, "unable to decode filename");
-		return lua_error(L);
+		return luaL_error(L, "unable to decode filename");
 	}
 
 	lua_pushstring(L, filename);

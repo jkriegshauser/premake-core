@@ -14,12 +14,12 @@ int os_islink(lua_State* L)
 
 #if PLATFORM_WINDOWS
 	{
-		wchar_t wide_path[PATH_MAX];
+		wchar_t wide_path[PATH_MAX + 1];
 		DWORD attr;
-		if (MultiByteToWideChar(CP_UTF8, 0, path, -1, wide_path, PATH_MAX) == 0)
+		int size = MultiByteToWideChar(CP_UTF8, 0, path, -1, wide_path, PATH_MAX + 1);
+		if (size <= 0 || size > PATH_MAX)
 		{
-			lua_pushstring(L, "unable to encode path");
-			return lua_error(L);
+			return luaL_error(L, "unable to encode path");
 		}
 
 		attr = GetFileAttributesW(wide_path);

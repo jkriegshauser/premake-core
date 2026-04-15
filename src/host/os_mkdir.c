@@ -13,16 +13,26 @@
 #if PLATFORM_WINDOWS
 #include <direct.h>
 #include <errno.h>
+#define alloca _alloca
 #endif
 
 int do_mkdir(const char* path)
 {
+	int i, length, s;
+#if PLATFORM_WINDOWS
+	struct _stat sb;
+	wchar_t wpath[MAX_PATH + 1];
+	int size = MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, MAX_PATH + 1);
+	if (size <= 0 || size > MAX_PATH)
+		return 0;  /* unable to encode path */
+	s = _wstat(wpath, &sb);
+#else
 	struct stat sb;
-	char sub_path[1024];
-	int i, length;
+	s = stat(path, &sb);
+#endif
 
 	// if it already exists, return.
-	if (stat(path, &sb) == 0)
+	if (s == 0)
 		return 1;
 
 	// find the parent folder name.
@@ -33,9 +43,11 @@ int do_mkdir(const char* path)
 			break;
 	}
 
-	// if we found one, create it.
+	// if we found one, recursively create it.
 	if (i > 0)
 	{
+		char* sub_path = alloca(i + 2); /* null terminator plus trailing slash on Windows */
+
 		memcpy(sub_path, path, i);
 		sub_path[i] = '\0';
 
@@ -53,7 +65,7 @@ int do_mkdir(const char* path)
 
 	// now finally create the actual folder we want.
 #if PLATFORM_WINDOWS
-	return _mkdir(path) == 0;
+	return _wmkdir(wpath) == 0;
 #else
 	return  mkdir(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == 0;
 #endif

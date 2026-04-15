@@ -15,6 +15,7 @@
 #else
 	#include <unistd.h>
 	#include <sys/types.h>
+	#include <utime.h>
 #endif
 
 #ifndef FALSE
@@ -24,41 +25,15 @@
 #define TRUE 1
 #endif
 
-static int truncate_file(const char* fn)
-{
-	FILE* file = fopen(fn, "rb");
-	size_t size;
-	file = fopen(fn, "ab");
-	if (file == NULL)
-	{
-		return FALSE;
-	}
-	fseek(file, 0, SEEK_END);
-	size = ftell(file);
-	// append a dummy space. There are better ways to do
-	// a touch, however this is a rather simple
-	// multiplatform method
-	if (fwrite(" ", 1, 1, file) != 1)
-	{
-		fclose(file);
-		return FALSE;
-	}
-#if PLATFORM_WINDOWS
-	if (_chsize(_fileno(file), (long)size) != 0)
-	{
-		fclose(file);
-		return FALSE;
-	}
-#endif
-	fclose(file);
 #if !PLATFORM_WINDOWS
-	if (truncate(fn, (off_t)size) != 0)
-	{
-		return FALSE;
-	}
-#endif
-	return TRUE;
+/* if this is ever used on windows, we need to convert to properly treat `fn` as UTF-8 */
+static int touch_file(const char* fn)
+{
+	struct utimebuf buf;
+	buf.actime = buf.modtime = time(NULL);
+	return utime(fn, &buf) == 0;
 }
+#endif
 
 int os_touchfile(lua_State* L)
 {
@@ -68,12 +43,14 @@ int os_touchfile(lua_State* L)
 	// if destination exist, mark the file as modified
 	if (do_isfile(L, dst))
 	{
+		/* existing file */
 #if PLATFORM_WINDOWS
 		SYSTEMTIME systemTime;
 		FILETIME fileTime;
 		HANDLE fileHandle;
-		wchar_t wide_path[PATH_MAX];
-		if (MultiByteToWideChar(CP_UTF8, 0, dst, -1, wide_path, PATH_MAX) == 0)
+		wchar_t wide_path[MAX_PATH + 1];
+		int size = MultiByteToWideChar(CP_UTF8, 0, dst, -1, wide_path, MAX_PATH + 1);
+		if (size <= 0 || size > MAX_PATH)
 		{
 			lua_pushinteger(L, -1);
 			lua_pushstring(L, "unable to encode path");
@@ -81,7 +58,7 @@ int os_touchfile(lua_State* L)
 		}
 
 		fileHandle = CreateFileW(wide_path, FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-		if (fileHandle == NULL)
+		if (fileHandle == NULL || fileHandle == INVALID_HANDLE_VALUE)
 		{
 			lua_pushinteger(L, -1);
 			lua_pushfstring(L, "unable to touch file '%s'", dst);
@@ -91,6 +68,7 @@ int os_touchfile(lua_State* L)
 		GetSystemTime(&systemTime);
 		if (SystemTimeToFileTime(&systemTime, &fileTime) == 0)
 		{
+			CloseHandle(fileHandle);
 			lua_pushinteger(L, -1);
 			lua_pushfstring(L, "unable to touch file '%s'", dst);
 			return 2;
@@ -98,15 +76,17 @@ int os_touchfile(lua_State* L)
 
 		if (SetFileTime(fileHandle, NULL, NULL, &fileTime) == 0)
 		{
+			CloseHandle(fileHandle);
 			lua_pushinteger(L, -1);
 			lua_pushfstring(L, "unable to touch file '%s'", dst);
 			return 2;
 		}
 
+		CloseHandle(fileHandle);
 		lua_pushinteger(L, 0);
 		return 1;
 #else
-		if (truncate_file(dst))
+		if (touch_file(dst))
 		{
 			lua_pushinteger(L, 0);
 			return 1;
@@ -118,9 +98,11 @@ int os_touchfile(lua_State* L)
 #endif
 	}
 
+	/* new file (doesn't previous exist) */
 #if PLATFORM_WINDOWS
-	wchar_t wide_path[PATH_MAX];
-	if (MultiByteToWideChar(CP_UTF8, 0, dst, -1, wide_path, PATH_MAX) == 0)
+	wchar_t wide_path[MAX_PATH + 1];
+	int size = MultiByteToWideChar(CP_UTF8, 0, dst, -1, wide_path, MAX_PATH + 1);
+	if (size <= 0 || size > MAX_PATH)
 	{
 		lua_pushinteger(L, -1);
 		lua_pushstring(L, "unable to encode path");

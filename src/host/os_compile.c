@@ -35,7 +35,24 @@ int os_compile(lua_State* L)
 	}
 	else
 	{
-		FILE* outputFile = (output == NULL) ? stdout : fopen(output, "wb");
+		FILE* outputFile = stdout;
+		if (output != NULL)
+		{
+#if PLATFORM_WINDOWS
+			wchar_t wide_output[MAX_PATH + 1];
+			int size = MultiByteToWideChar(CP_UTF8, 0, output, -1, wide_output, MAX_PATH + 1);
+			if (size <= 0 || size > MAX_PATH)
+			{
+				lua_close(P);
+				lua_pushnil(L);
+				lua_pushfstring(L, "unable to encode output path");
+				return 2;
+			}
+			outputFile = _wfopen(wide_output, L"wb");
+#else
+			outputFile = fopen(output, "wb");
+#endif
+		}
 		if (outputFile == NULL)
 		{
 			lua_close(P);

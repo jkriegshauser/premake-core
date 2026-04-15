@@ -589,3 +589,109 @@ function suite.targetarch()
 	_OPTIONS["arch"] = "arm64"
 	test.isequal(_OPTIONS["arch"], os.targetarch())
 end
+
+
+--
+-- os.remove() Unicode tests.
+--
+
+	function suite.remove_ReturnsTrue_OnUnicodeFile()
+		local p = tmpname() .. "_café"
+		io.open(p, "w"):close()
+		local ok, err = os.remove(p)
+		test.isequal(true, ok)
+		test.isnil(err)
+	end
+
+	function suite.remove_ReturnsError_OnNonExistingUnicodePath()
+		local ok, err, exitcode = os.remove(tmpname() .. "_café")
+		test.isnil(ok)
+		test.isequal("string", type(err))
+		test.isequal("number", type(exitcode))
+		test.istrue(0 ~= exitcode)
+	end
+
+
+--
+-- os.rename() tests.
+--
+
+	function suite.rename_ReturnsTrue_OnValidRename()
+		local src = tmpfile()
+		local dst = tmpname()
+		local ok, err = os.rename(src, dst)
+		test.isequal(true, ok)
+		test.isnil(err)
+		os.remove(dst)
+	end
+
+	function suite.rename_ReturnsError_OnNonExistingSource()
+		local ok, err = os.rename(tmpname(), tmpname())
+		test.isnil(ok)
+		test.isequal("string", type(err))
+	end
+
+	function suite.rename_ReturnsTrue_OnUnicodeSrc()
+		local src = tmpname() .. "_café"
+		local dst = tmpname()
+		io.open(src, "w"):close()
+		local ok, err = os.rename(src, dst)
+		test.isequal(true, ok)
+		test.isnil(err)
+		os.remove(dst)
+	end
+
+	function suite.rename_ReturnsTrue_OnUnicodeDst()
+		local src = tmpfile()
+		local dst = tmpname() .. "_naïve"
+		local ok, err = os.rename(src, dst)
+		test.isequal(true, ok)
+		test.isnil(err)
+		os.remove(dst)
+	end
+
+	function suite.rename_ReturnsTrue_OnUnicodeSrcAndDst()
+		local src = tmpname() .. "_café"
+		local dst = tmpname() .. "_naïve"
+		io.open(src, "w"):close()
+		local ok, err = os.rename(src, dst)
+		test.isequal(true, ok)
+		test.isnil(err)
+		os.remove(dst)
+	end
+
+
+--
+-- os.getenv() tests.
+--
+
+	function suite.getenv_ReturnsValue_ForExistingVar()
+		local val = os.getenv("PATH")
+		test.istrue(val ~= nil)
+		test.isequal("string", type(val))
+	end
+
+	function suite.getenv_ReturnsNil_ForNonExistingVar()
+		local val = os.getenv("PREMAKE_NONEXISTENT_VARIABLE_12345")
+		test.isnil(val)
+	end
+
+
+--
+-- os.tmpname() tests.
+--
+
+	function suite.tmpname_ReturnsString()
+		local p = os.tmpname()
+		test.isequal("string", type(p))
+		test.istrue(#p > 0)
+		os.remove(p)
+	end
+
+	function suite.tmpname_ReturnsUniquePaths()
+		local a = os.tmpname()
+		local b = os.tmpname()
+		test.istrue(a ~= b)
+		os.remove(a)
+		os.remove(b)
+	end

@@ -16,6 +16,7 @@
 	#include <unistd.h>
 	#include <sys/types.h>
 	#include <utime.h>
+	#include <time.h>
 #endif
 
 #ifndef FALSE
@@ -29,7 +30,7 @@
 /* if this is ever used on windows, we need to convert to properly treat `fn` as UTF-8 */
 static int touch_file(const char* fn)
 {
-	struct utimebuf buf;
+	struct utimbuf buf;
 	buf.actime = buf.modtime = time(NULL);
 	return utime(fn, &buf) == 0;
 }

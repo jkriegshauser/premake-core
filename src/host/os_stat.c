@@ -7,6 +7,7 @@
 #include "premake.h"
 #include <sys/stat.h>
 #include <errno.h>
+#include <string.h>
 
 int os_stat(lua_State* L)
 {

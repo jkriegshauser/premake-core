@@ -139,7 +139,7 @@ static void releaseKeyInfo(struct RegKeyInfo *info)
 
 int os_getWindowsRegistry(lua_State *L)
 {
-	RegKeyInfo info = {};
+	RegKeyInfo info = {0, 0, 0, NULL, 0};
 	wchar_t *wpath;
 	const char *path = luaL_checkstring(L, 1);
 	int size = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);

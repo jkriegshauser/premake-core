@@ -77,7 +77,8 @@ static int write_link(const char* filename, const char* bytes, size_t count)
 #if PLATFORM_POSIX
 	(void)(count);
 	return symlink(bytes, filename);
-#elif PLATFORM_WINDOWS
+#else
+#if PLATFORM_WINDOWS
 	wchar_t wfilename[MAX_PATH + 1];
 	int size = MultiByteToWideChar(CP_UTF8, 0, filename, -1, wfilename, MAX_PATH + 1);
 	if (size <= 0 || size > MAX_PATH)
@@ -97,6 +98,7 @@ static int write_link(const char* filename, const char* bytes, size_t count)
 	fwrite(bytes, sizeof(char), count, fp);
 	fclose(fp);
 	return 0;
+#endif
 }
 
 extern int do_mkdir(const char* path);

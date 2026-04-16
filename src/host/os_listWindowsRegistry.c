@@ -110,7 +110,7 @@ int convertString(const wchar_t *value, char **pbuf, int *psize)
 
 static int listNodes(HKEY key, ListCallback callback, void * user)
 {
-	RegNodeInfo node = {};
+	RegNodeInfo node = {NULL, NULL, 0, REG_NONE};
 	DWORD maxSubkeyLength; // in characters
 	DWORD maxValueLength; // in bytes
 	DWORD maxNameLength; // in characters

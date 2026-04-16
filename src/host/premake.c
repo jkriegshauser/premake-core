@@ -518,12 +518,14 @@ int premake_locate_executable(lua_State* L, const char* argv0)
 		}
 		lua_pop(L, 1);
 
+#if PLATFORM_WINDOWS
 		if (wpath)
 		{
 			free(wpath);
 			wpath = NULL;
 			size = 0;
 		}
+#endif
 	}
 
 	/* If all else fails, use argv[0] as-is and hope for the best */

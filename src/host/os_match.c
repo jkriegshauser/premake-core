@@ -20,19 +20,11 @@ typedef struct struct_MatchInfo
 
 int os_matchstart(lua_State* L)
 {
-	const char* mask = luaL_checkstring(L, 1);
-	MatchInfo* m;
+	const wchar_t *mask = luaL_checkconvertstring(L, 1);
+	MatchInfo* m = (MatchInfo*)malloc(sizeof(MatchInfo));
 
-	wchar_t wide_mask[PATH_MAX];
-	if (MultiByteToWideChar(CP_UTF8, 0, mask, -1, wide_mask, PATH_MAX) == 0)
-	{
-		lua_pushstring(L, "unable to encode mask");
-		return lua_error(L);
-	}
-
-	m = (MatchInfo*)malloc(sizeof(MatchInfo));
-
-	m->handle = FindFirstFileW(wide_mask, &m->entry);
+	m->handle = FindFirstFileW(mask, &m->entry);
+	lua_pop(L, 1);
 	m->is_first = 1;
 	lua_pushlightuserdata(L, m);
 	return 1;
@@ -51,15 +43,7 @@ int os_matchname(lua_State* L)
 {
 	MatchInfo* m = (MatchInfo*)lua_touserdata(L, 1);
 
-	char filename[PATH_MAX];
-	if (WideCharToMultiByte(CP_UTF8, 0, m->entry.cFileName, -1, filename, PATH_MAX, NULL, NULL) == 0)
-	{
-		lua_pushstring(L, "unable to decode filename");
-		return lua_error(L);
-	}
-
-	lua_pushstring(L, filename);
-	return 1;
+	return !!luaL_convertwstring(L, m->entry.cFileName, NULL);
 }
 
 int os_matchisfile(lua_State* L)

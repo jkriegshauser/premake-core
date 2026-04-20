@@ -5,11 +5,25 @@
  */
 
 #include "premake.h"
+#if PLATFORM_WINDOWS
+#include <shellapi.h>
+#include <assert.h>
+#endif
 
+#if PLATFORM_WINDOWS
+int wmain(int argc, const wchar_t** argv)
+#else
 int main(int argc, const char** argv)
+#endif
 {
-	lua_State* L;
+	lua_State *L;
 	int z;
+
+#if PLATFORM_WINDOWS
+	/* Set UTF-8 console output for proper string formatting */
+	SetConsoleOutputCP(CP_UTF8);
+	SetConsoleCP(CP_UTF8);
+#endif
 
 	L = luaL_newstate();
 	luaL_openlibs(L);

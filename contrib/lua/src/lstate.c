@@ -27,6 +27,13 @@
 #include "ltable.h"
 #include "ltm.h"
 
+#if defined(LUA_USE_WINDOWS)
+#include "lauxlib.h"
+#include <windows.h>
+#else
+#include <stdlib.h>
+#endif
+
 
 #if !defined(LUAI_GCPAUSE)
 #define LUAI_GCPAUSE	200  /* 200% */
@@ -343,5 +350,3 @@ LUA_API void lua_close (lua_State *L) {
   lua_lock(L);
   close_state(L);
 }
-
-

@@ -17,6 +17,11 @@
 #define alloca _alloca
 #endif
 #endif
+#if defined(__has_include)
+#if __has_include(<alloca.h>)
+#include <alloca.h>
+#endif
+#endif
 
 int do_mkdir(lua_State *L, const char* path)
 {

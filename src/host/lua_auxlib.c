@@ -149,7 +149,7 @@ static int chunk_wrapper(lua_State* L)
 	/* Remember the current _SCRIPT and working directory so I can
 	 * restore them after this new chunk has been run. */
 
-	do_getcwd(cwd, PATH_MAX);
+	do_getcwd(cwd, sizeof(cwd) / sizeof(cwd[0]));
 	lua_getglobal(L, "_SCRIPT");
 	lua_getglobal(L, "_SCRIPT_DIR");
 

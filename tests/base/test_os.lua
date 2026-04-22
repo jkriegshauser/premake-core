@@ -639,5 +639,3 @@ function suite.targetarch()
 	_OPTIONS["arch"] = "AARCH64"
 	test.isequal(_OPTIONS["arch"], os.targetarch())
 end
-
-

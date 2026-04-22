@@ -13,7 +13,7 @@ int do_chdir(lua_State* L, const char* path)
 
 #if PLATFORM_WINDOWS
 	const wchar_t *wpath = luaL_convertstring(L, path);
-	if (!wpath) return 0;
+	if (!wpath) return luaL_error(L, "unable to encode path");
 	z = SetCurrentDirectoryW(wpath);
 	lua_pop(L, 1);
 #else

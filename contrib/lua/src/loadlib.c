@@ -22,7 +22,6 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
-#include "lstate.h"
 
 
 /*
@@ -188,12 +187,9 @@ static void setprogdir (lua_State *L) {
 static void pusherror (lua_State *L) {
   int error = GetLastError();
   wchar_t wbuffer[128];
-  if (FormatMessageW(FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM,
-      NULL, error, 0, wbuffer, sizeof(wbuffer)/sizeof(wchar_t), NULL))
-  {
-    luaL_convertwstring(L, wbuffer, NULL);
-  }
-  else
+  if (!FormatMessageW(FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM,
+        NULL, error, 0, wbuffer, sizeof(wbuffer)/sizeof(wchar_t), NULL) ||
+      !luaL_convertwstring(L, wbuffer, NULL))
     lua_pushfstring(L, "system error %d\n", error);
 }
 

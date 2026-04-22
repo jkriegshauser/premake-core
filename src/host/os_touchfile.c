@@ -99,7 +99,7 @@ int os_touchfile(lua_State* L)
 #endif
 	}
 
-	/* new file (doesn't previous exist) */
+	/* new file (doesn't previously exist) */
 #if PLATFORM_WINDOWS
 	const wchar_t *wpath = luaL_convertstring(L, dst);
 	if (!wpath)
@@ -124,6 +124,6 @@ int os_touchfile(lua_State* L)
 	}
 
 	lua_pushinteger(L, -1);
-	lua_pushfstring(L, "unable to open file to '%s'", dst);
+	lua_pushfstring(L, "unable to touch file '%s'", dst);
 	return 2;
 }

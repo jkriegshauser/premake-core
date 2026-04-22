@@ -18,7 +18,6 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
-#include "lstate.h"
 
 
 #if !defined(LUA_PROMPT)
@@ -529,6 +528,8 @@ static int runargs (lua_State *L, char **argv, int n) {
   }
   return 1;
 }
+
+
 
 static int handle_luainit (lua_State *L) {
   const char *name = "=" LUA_INITVARVERSION;

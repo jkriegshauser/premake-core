@@ -100,11 +100,14 @@ int os_writefile_ifnotequal(lua_State* L)
 
 	if (file != NULL)
 	{
-		fwrite(content, 1, length, file);
+		int error = fwrite(content, length, 1, file) != 1;
 		fclose(file);
 
-		lua_pushinteger(L, 1);
-		return 1;
+		if (!error)
+		{
+			lua_pushinteger(L, error ? -1 : 0);
+			return 1;
+		}
 	}
 
 	lua_pushinteger(L, -1);

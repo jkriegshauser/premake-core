@@ -19,11 +19,9 @@
 #include "lua.h"
 
 #include "lauxlib.h"
-#include "lstate.h"
 #include "lualib.h"
 
 #if defined(LUA_USE_WINDOWS)
-#include <windows.h>
 #include <wchar.h>
 #endif
 
@@ -144,31 +142,26 @@ static time_t l_checktime (lua_State *L, int arg) {
 
 
 static int os_execute (lua_State *L) {
+#if defined(LUA_USE_WINDOWS)
+  const wchar_t *cmd = luaL_optconvertstring(L, 1, NULL);
+  int stat = _wsystem(cmd);
+#else
   const char *cmd = luaL_optstring(L, 1, NULL);
-  int stat;
-  if (cmd == NULL)
-  {
-    lua_pushboolean(L, system(NULL));  /* true if there is a shell */
+  int stat = system(cmd);
+#endif
+  if (cmd != NULL)
+    return luaL_execresult(L, stat);
+  else {
+    lua_pushboolean(L, stat);  /* true if there is a shell */
     return 1;
   }
-  else
-  {
-#if defined(LUA_USE_WINDOWS)
-    stat = _wsystem(luaL_checkconvertstring(L, 1));
-    lua_pop(L, 1);
-#else
-    stat = system(cmd);
-#endif
-  }
-  return luaL_execresult(L, stat);
 }
 
 
 static int os_remove (lua_State *L) {
   const char *filename = luaL_checkstring(L, 1);
 #if defined(LUA_USE_WINDOWS)
-  const wchar_t *wfilename = luaL_checkconvertstring(L, 1);
-  return luaL_fileresult(L, _wremove(wfilename) == 0, filename);
+  return luaL_fileresult(L, _wremove(luaL_checkconvertstring(L, 1)) == 0, filename);
 #else
   return luaL_fileresult(L, remove(filename) == 0, filename);
 #endif
@@ -176,12 +169,13 @@ static int os_remove (lua_State *L) {
 
 
 static int os_rename (lua_State *L) {
+#if defined(LUA_USE_WINDOWS)  /* PREMAKE: UTF-8 support on Windows */
+  const wchar_t *toname = luaL_checkconvertstring(L, 2);
+  const wchar_t *fromname = luaL_checkconvertstring(L, 1);
+  return luaL_fileresult(L, _wrename(fromname, toname) == 0, NULL);
+#else
   const char *fromname = luaL_checkstring(L, 1);
   const char *toname = luaL_checkstring(L, 2);
-#if defined(LUA_USE_WINDOWS)  /* PREMAKE: UTF-8 support on Windows */
-  const wchar_t *wfrom = luaL_checkconvertstring(L, 1), *wto = luaL_checkconvertstring(L, 2);
-  return luaL_fileresult(L, _wrename(wfrom, wto) == 0, NULL);
-#else
   return luaL_fileresult(L, rename(fromname, toname) == 0, NULL);
 #endif
 }
@@ -190,9 +184,8 @@ static int os_rename (lua_State *L) {
 static int os_tmpname (lua_State *L) {
 #if defined(LUA_USE_WINDOWS)  /* PREMAKE: UTF-8 support on Windows */
   wchar_t wbuff[LUA_TMPNAMBUFSIZE];
-  if (_wtmpnam(wbuff) == NULL)
+  if (_wtmpnam(wbuff) == NULL || !luaL_convertwstring(L, wbuff, NULL))
     return luaL_error(L, "unable to generate a unique filename");
-  luaL_convertwstring(L, wbuff, NULL);
 #else
   char buff[LUA_TMPNAMBUFSIZE];
   int err;
@@ -201,13 +194,13 @@ static int os_tmpname (lua_State *L) {
     return luaL_error(L, "unable to generate a unique filename");
   lua_pushstring(L, buff);
 #endif
-  return 1;
+return 1;
 }
 
 
 int os_getenv (lua_State *L) {
   if (!luaL_getenv(L, luaL_checkstring(L, 1)))
-    lua_pushnil(L);
+    lua_pushnil(L);  /* if NULL push nil */
   return 1;
 }
 

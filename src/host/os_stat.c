@@ -16,15 +16,16 @@ int os_stat(lua_State* L)
 	const wchar_t *filename = luaL_checkconvertstring(L, 1);
 	struct _stat s;
 
-	int success = (_wstat(filename, &s) != 0);
+	int failed = (_wstat(filename, &s) != 0);
 	lua_pop(L, 1);
-	if (success)
 #else
 	const char* filename = luaL_checkstring(L, 1);
 	struct stat s;
 
-	if (stat(filename, &s) != 0)
+	int failed = (stat(filename, &s) != 0);
 #endif
+
+	if (failed)
 	{
 		lua_pushnil(L);
 		switch (errno)

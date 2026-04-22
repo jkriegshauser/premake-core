@@ -21,8 +21,10 @@ int os_comparefiles(lua_State* L)
 	char secondBuffer[4096];
 
 #if PLATFORM_WINDOWS
-	const wchar_t *firstPath = luaL_checkconvertstring(L, 1);
+	// if we read the first argument first, it might push to the stack obscuring
+	// a missing second argument. So read the second argument first.
 	const wchar_t *secondPath = luaL_checkconvertstring(L, 2);
+	const wchar_t *firstPath = luaL_checkconvertstring(L, 1);
 	firstFile = _wfopen(firstPath, L"rb");
 	secondFile = _wfopen(secondPath, L"rb");
 #else

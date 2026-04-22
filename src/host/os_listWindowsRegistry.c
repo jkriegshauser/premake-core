@@ -13,7 +13,7 @@ typedef struct RegNodeInfo
 {
 	const char * name;
 	LPBYTE value;
-	DWORD valueSize;
+	DWORD valueBytes;
 	DWORD type;
 } RegNodeInfo;
 
@@ -112,8 +112,8 @@ static int listNodes(HKEY key, ListCallback callback, void * user)
 {
 	RegNodeInfo node = {NULL, NULL, 0, REG_NONE};
 	DWORD maxSubkeyLength; // in characters
-	DWORD maxValueLength; // in bytes
 	DWORD maxNameLength; // in characters
+	DWORD maxValueBytes; // in bytes
 	DWORD numSubkeys;
 	DWORD numValues;
 	DWORD length;
@@ -129,7 +129,7 @@ static int listNodes(HKEY key, ListCallback callback, void * user)
 		return 0;
 
 	// Fetch info about key content
-	if (RegQueryInfoKeyW(key, NULL, NULL, NULL, &numSubkeys, &maxSubkeyLength, NULL, &numValues, &maxNameLength, &maxValueLength, NULL, NULL) != ERROR_SUCCESS)
+	if (RegQueryInfoKeyW(key, NULL, NULL, NULL, &numSubkeys, &maxSubkeyLength, NULL, &numValues, &maxNameLength, &maxValueBytes, NULL, NULL) != ERROR_SUCCESS)
 		return 0;
 
 	// Allocate name and value buffers
@@ -137,8 +137,8 @@ static int listNodes(HKEY key, ListCallback callback, void * user)
 		maxNameLength = maxSubkeyLength;
 
 	maxNameLength++; // space for null terminator
-	maxValueLength += (2 * sizeof(wchar_t)); // space for two null terminators (for REG_MULTI_SZ)
-	buf = malloc((maxNameLength * sizeof(wchar_t)) + maxValueLength);
+	maxValueBytes += (2 * sizeof(wchar_t)); // space for two null terminators (for REG_MULTI_SZ)
+	buf = malloc((maxNameLength * sizeof(wchar_t)) + maxValueBytes);
 	if (!buf)
 		return 0;
 
@@ -166,14 +166,14 @@ static int listNodes(HKEY key, ListCallback callback, void * user)
 		node.value = value;
 		for (index = 0; index < numValues; index++) {
 			length = maxNameLength;
-			node.valueSize = maxValueLength;
-			if (RegEnumValueW(key, index, name, &length, NULL, &node.type, value, &node.valueSize) != ERROR_SUCCESS) {
+			node.valueBytes = maxValueBytes;
+			if (RegEnumValueW(key, index, name, &length, NULL, &node.type, value, &node.valueBytes) != ERROR_SUCCESS) {
 				ok = 0;
 				break;
 			}
 
 			// Ensure proper termination of strings (two terminators for the REG_MULTI_SZ)
-			memset(value + node.valueSize, 0, 2 * sizeof(wchar_t));
+			memset(value + node.valueBytes, 0, 2 * sizeof(wchar_t));
 
 			if (!convertString(name, &namebuf, &namesize)) {
 				ok = 0;
@@ -216,7 +216,7 @@ static void listCallback(const RegNodeInfo* info, void* user)
 		case REG_RESOURCE_LIST:
 		case REG_FULL_RESOURCE_DESCRIPTOR:
 		case REG_RESOURCE_REQUIREMENTS_LIST: {
-			lua_pushlstring(L, (char *)info->value, info->valueSize);
+			lua_pushlstring(L, (char *)info->value, info->valueBytes);
 			break;
 		}
 
@@ -248,7 +248,7 @@ static void listCallback(const RegNodeInfo* info, void* user)
 		// Multiple strings
 		case REG_MULTI_SZ: {
 			int k = 1;
-			const wchar_t *end = (const wchar_t *)(info->value + info->valueSize);
+			const wchar_t *end = (const wchar_t *)(info->value + info->valueBytes);
 			lua_newtable(L);
 			for (const wchar_t *p = (const wchar_t *)info->value; p < end; p += wcslen(p) + 1) {
 				char *str = convertString(p, &state->valbuf, &state->valsize) ? state->valbuf : "Error converting value";

@@ -374,15 +374,12 @@ int premake_execute(lua_State* L, int argc, const TCHAR** argv, const char* scri
  */
 int premake_locate_executable(lua_State* L, const TCHAR* argv0)
 {
-	char buffer[PATH_MAX + 1];
 	const char* path = NULL;
-
 	const char *pargv0 = NULL;
+
 #if PLATFORM_WINDOWS
 	int argv0idx = lua_gettop(L) + 1;
 	int filenameidx = lua_gettop(L) + 2;
-
-	(void)(buffer);
 
 	pargv0 = luaL_convertwstring(L, argv0, NULL);
 	if (!pargv0)
@@ -401,6 +398,7 @@ int premake_locate_executable(lua_State* L, const TCHAR* argv0)
 		}
 	}
 #else
+	char buffer[PATH_MAX + 1];
 	pargv0 = argv0;
 #endif
 
@@ -489,7 +487,7 @@ int premake_locate_executable(lua_State* L, const TCHAR* argv0)
 
 	lua_pushstring(L, path);
 #if PLATFORM_WINDOWS
-	/* cleanup translation stack slots */
+	/* cleanup translation stack slots; note this must be in reverse order */
 	if (filenameidx) lua_remove(L, filenameidx);
 	if (argv0idx) lua_remove(L, argv0idx);
 #endif
@@ -524,7 +522,7 @@ int premake_locate_file(lua_State* L, const char* filename, int searchMask)
 		{
 			int idx = lua_gettop(L);
 			int result = do_locate(L, filename, path);
-			lua_remove(L, idx);
+			lua_remove(L, idx); /* remove env var from stack */
 			if (result) return OKAY;
 		}
 	}
@@ -579,7 +577,7 @@ static void build_premake_path(lua_State* L)
 	/* Then the PREMAKE_PATH environment variable */
 	lua_pushstring(L, ";");
 	if (luaL_getenv(L, "PREMAKE_PATH"))
-		lua_pushstring(L, ";");  /* push another ';' for the next op */
+		lua_pushstring(L, ";");  /* push another ';' for the next path */
 
 	/* Then in ~/.premake */
 	lua_getglobal(L, "_USER_HOME_DIR");
@@ -656,7 +654,7 @@ static int process_arguments(lua_State* L, int argc, const TCHAR** argv)
 			set_scripts_path(parg + 10);
 		}
 #if PLATFORM_WINDOWS
-		lua_pop(L, 1);
+		lua_pop(L, 1); /* pop the original converted parg string */
 #endif
 	}
 	lua_setglobal(L, "_ARGV");
@@ -777,6 +775,7 @@ int premake_getEmbeddedResource(lua_State* L)
 
 #ifndef LUA_STATICLIB
 // Functions added to our version of Lua in contrib/lua; need to reimplement when building against system Lua
+// Copied from lauxlib.c in contrib/lua
 const char *luaL_getenv(lua_State *L, const char *name)
 {
 #if PLATFORM_WINDOWS

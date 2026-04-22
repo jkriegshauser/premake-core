@@ -45,4 +45,3 @@ function suite.loadfile_with_require()
 	assert(require("folder"))
 end
 
-

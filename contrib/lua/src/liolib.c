@@ -275,7 +275,8 @@ static int io_open (lua_State *L) {
 #if defined(LUA_USE_WINDOWS)  /* PREMAKE: UTF-8 support on Windows */
   {
     const wchar_t *wfilename = luaL_convertstring(L, filename), *wmode = luaL_convertstring(L, md);
-    if (wfilename == NULL || wmode == NULL) luaL_error(L, "encoding error");
+    if (wfilename == NULL || wmode == NULL)
+      return (errno = EINVAL, luaL_fileresult(L, 0, filename)); /* encoding error */
     p->f = _wfopen(wfilename, wmode);
     lua_pop(L, 2); /* pop converted strings */
   }

@@ -13,8 +13,10 @@ int os_copyfile(lua_State* L)
 
 
 #if PLATFORM_WINDOWS
-	const wchar_t* src = luaL_checkconvertstring(L, 1);
+	// if we read the first argument first, it might push to the stack obscuring
+	// a missing second argument. So read the second argument first.
 	const wchar_t* dst = luaL_checkconvertstring(L, 2);
+	const wchar_t* src = luaL_checkconvertstring(L, 1);
 	z = CopyFileW(src, dst, FALSE);
 #else
 	const char* src = luaL_checkstring(L, 1);
@@ -29,12 +31,12 @@ int os_copyfile(lua_State* L)
 #if PLATFORM_WINDOWS
 		wchar_t buf[256];
 		DWORD ec = GetLastError();
+		const char *err = NULL;
 		if (FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM, NULL, ec,
-			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf, 256, NULL))
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf, 256, NULL) && (err = luaL_convertwstring(L, buf, NULL)) != NULL)
 		{
-			const char *err = luaL_convertwstring(L, buf, NULL);
-			lua_pushfstring(L, "unable to copy file to '%s', reason: '%s'", dst, err ? err : "<conversion failure>");
-			if (err) lua_remove(L, -2); /* converted string */
+			lua_pushfstring(L, "unable to copy file to '%s', reason: '%s' (%lu)", dst, err, ec);
+			lua_remove(L, -2); /* converted string */
 		}
 		else
 			lua_pushfstring(L, "unable to copy file to '%s', error code: %lu", dst, ec);

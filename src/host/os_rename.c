@@ -33,8 +33,8 @@ int os_rename(lua_State* L)
 			LocalFree(messageBuffer);
 		}
 
-		lua_pushfstring(L, "%s: %s", fromname, pushed ? lua_tostring(L, -1) : "<failed to get error message>");
-		if (pushed) lua_remove(L, -2);
+		lua_pushfstring(L, "%s: %s (%I)", fromname, pushed ? lua_tostring(L, -1) : "<failed to get error message>", (lua_Integer)err);
+		if (pushed) lua_remove(L, -2); /* remove converted string */
 		lua_pushinteger(L, err);
 		return 3;
 	}

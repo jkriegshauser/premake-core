@@ -141,12 +141,6 @@ void do_translate(char* value, const char sep);
 int term_doGetTextColor();
 void term_doSetTextColor(int color);
 
-#if PLATFORM_WINDOWS
-// Returns 0 if not found or an error occurs; 1 if found and written to *pvalue.
-// The caller is responsible for calling free() on *pvalue if it is not NULL.
-int get_envvar(wchar_t **pvalue, DWORD *psize, const wchar_t *name);
-#endif
-
 /* Built-in functions */
 int criteria_compile(lua_State* L);
 int criteria_delete(lua_State* L);
@@ -259,6 +253,7 @@ int premake_searcher_Lua(lua_State *L);
 
 #ifndef LUA_STATICLIB
 // Functions added to our version of Lua in contrib/lua; need to reimplement when building against system Lua
+// Copied from lauxlib.c in contrib/lua
 const char *(luaL_getenv) (lua_State *L, const char *name);
 /* converts a UTF-8 Lua string at `idx` to a wide string */
 const wchar_t *(luaL_convertlstringi) (lua_State *L, int idx, size_t *len);

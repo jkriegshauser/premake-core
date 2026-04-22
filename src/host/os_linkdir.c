@@ -37,7 +37,10 @@ int do_linkdir(lua_State* L, const char* src, const char* dst)
 		// Get the current working directory
 		wchar_t cwd[MAX_PATH + 1];
 		if (GetCurrentDirectoryW(MAX_PATH + 1, cwd) > MAX_PATH)
+		{
+			lua_pop(L, 2); /* remove converted strings */
 			return FALSE;
+		}
 
 		// Convert the source path to a relative path
 		wchar_t relSrcPath[2 * MAX_PATH + 1];

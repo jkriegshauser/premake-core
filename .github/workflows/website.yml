@@ -5,6 +5,8 @@ on:
     paths: ['website/**']
   pull_request:
     paths: ['website/**']
+  workflow_dispatch:
+    paths: ['website/**']
 
 jobs:
   checks:

@@ -5,6 +5,7 @@
  */
 
 #include "premake.h"
+#include <locale.h>
 #if PLATFORM_WINDOWS
 #include <shellapi.h>
 #include <assert.h>
@@ -20,9 +21,13 @@ int main(int argc, const char** argv)
 	int z;
 
 #if PLATFORM_WINDOWS
-	/* Set UTF-8 console output for proper string formatting */
 	SetConsoleOutputCP(CP_UTF8);
 	SetConsoleCP(CP_UTF8);
+	if (!setlocale(LC_CTYPE, ".UTF-8"))
+		setlocale(LC_CTYPE, "");
+#else
+	if (!setlocale(LC_CTYPE, "C.UTF-8"))
+		setlocale(LC_CTYPE, "");
 #endif
 
 	L = luaL_newstate();
